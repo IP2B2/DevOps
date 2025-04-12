@@ -1,19 +1,18 @@
 services:
-  # let them commented until the 3 docker containers are up and running
-  #nginx:
-  #image: nginx:latest
-  #ports:
-    #- "80:80"
-    #- "443:443"
-  #volumes:
-    #- ./nginx/conf.d:/etc/nginx/conf.d:ro
-    #- ./nginx/certs:/etc/nginx/certs:ro  # For SSL later on
-  #depends_on:
-    #- frontend
-    #- backend
-    #- database
-  #networks:
-    #- app-network
+  # Partial support for nginx 
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx:/etc/nginx:ro
+    depends_on:
+      - frontend
+      - backend
+      - database
+    networks:
+      - app-network
 
   backend:
     image: ${DOCKER_USER}/backend:latest
