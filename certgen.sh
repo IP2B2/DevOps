@@ -9,6 +9,7 @@ else
 	mkdir -p $CERT_PATH
 fi
 
+
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 	-subj "/C=RO/ST=Iasi/L=Iasi/O=IP2B2" \
 	-keyout $CERT_PATH/common.key \
