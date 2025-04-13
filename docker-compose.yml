@@ -2,6 +2,7 @@ services:
   # Partial support for nginx 
   nginx:
     image: nginx:latest
+    container_name: nginx
     ports:
       - "80:80"
       - "443:443"
@@ -16,29 +17,29 @@ services:
 
   backend:
     image: ${DOCKER_USER}/backend:latest
+    container_name: backend
     ports:
       - "8080:8080"
     networks: 
       - app-network
     depends_on:
       - database
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-
+    env_file:
+      - .env
+    
   frontend:
     image: ${DOCKER_USER}/frontend:latest
+    container_name: frontend
     ports:
       - "3000:3000"
     networks: 
       - app-network
-    #depends_on:
-     # - backend
+    depends_on:
+      - backend
 
   database:
     image: postgres:latest
+    container_name: database-prod
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -49,6 +50,7 @@ services:
       - app-network
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/init_processed.sql:/docker-entrypoint-initdb.d/init.sql
 
 networks:
   app-network:
