@@ -10,6 +10,7 @@ services:
     volumes:
       - ./nginx:/etc/nginx:ro
       - ./nginx/certs:/ssl:ro
+      - /home/deploy/DevOps:/auth:ro
     depends_on:
       - frontend
       - backend
