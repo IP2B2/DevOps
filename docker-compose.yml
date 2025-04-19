@@ -1,4 +1,5 @@
 services:
+  # The app itself (prod only, soon testing)
   # Partial support for nginx 
   nginx:
     image: nginx:latest
@@ -8,13 +9,15 @@ services:
       - "443:443"
     volumes:
       - ./nginx:/etc/nginx:ro
+      - ./nginx/certs:/ssl:ro
     depends_on:
       - frontend
       - backend
       - database
+      - grafana
     networks:
       - app-network
-
+  
   backend:
     image: ${DOCKER_USER}/backend:latest
     container_name: backend
@@ -34,8 +37,6 @@ services:
       - "3000:3000"
     networks: 
       - app-network
-    depends_on:
-      - backend
 
   database:
     image: postgres:latest
@@ -50,7 +51,62 @@ services:
       - app-network
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/init_processed.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db:/docker-entrypoint-initdb.d
+  
+  # Monitoring
+  grafana:
+    image: grafana/grafana-oss
+    container_name: grafana
+    ports:
+      - "9999:9999"
+    env_file:
+      - .env
+    volumes:
+      - ./monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - app-network
+    restart: unless-stopped 
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.4.1
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/mnt/config/loki-config.yaml
+    volumes:
+      - ./monitoring:/mnt/config
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.4.1
+    container_name: promtail
+    volumes:
+      - ./monitoring:/mnt/config
+      - /var/log:/var/log
+    command: -config.file=/mnt/config/promtail-config.yaml
+    depends_on:
+      - loki
+    networks:
+      - app-network
+    restart: unless-stopped
 
 networks:
   app-network:
@@ -58,3 +114,5 @@ networks:
 
 volumes:
   postgres_data:
+  grafana-storage:
+  prometheus-data:
