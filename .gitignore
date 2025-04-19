@@ -4,3 +4,5 @@ certs
 start.sh
 db/
 index.html
+monitoring/grafana/
+monitoring/loki
