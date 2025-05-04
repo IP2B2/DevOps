@@ -16,7 +16,10 @@ services:
       - backend
       - database
       - grafana
-    networks:
+      - backend-testing
+      - frontend-testing
+      - database-testing    
+networks:
       - app-network
   
   backend:
@@ -30,13 +33,37 @@ services:
       - database
     env_file:
       - .env
-    
+  
+   backend-testing:
+    image: ${DOCKER_USER}/backend-testing:latest
+    container_name: backend-testing
+    ports:
+      - "8081:8081"
+    networks:
+      - app-network
+    depends_on:
+      - frontend
+      - database-testing
+    env_file:
+      - .env
+   
   frontend:
     image: ${DOCKER_USER}/frontend:latest
     container_name: frontend
     ports:
       - "3000:3000"
     networks: 
+      - app-network
+
+
+ frontend-testing:
+    image: ${DOCKER_USER}/frontend-testing:latest
+    container_name: frontend-testing
+    ports:
+      - "3001:3001"
+    depends-on:
+      - backend-testing    
+    networks:
       - app-network
 
   database:
@@ -54,6 +81,22 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./db:/docker-entrypoint-initdb.d
   
+
+  database-testing:
+    image: postgres:latest
+    container_name: database-testing
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB_TESTING}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5433"
+    networks:
+      - app-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d
+
   # Monitoring
   grafana:
     image: grafana/grafana-oss
