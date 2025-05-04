@@ -19,7 +19,7 @@ services:
       - backend-testing
       - frontend-testing
       - database-testing    
-networks:
+    networks:
       - app-network
   
   backend:
