@@ -7,6 +7,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "3101:3101" # for testing
     volumes:
       - ./nginx:/etc/nginx:ro
       - ./nginx/certs:/ssl:ro
@@ -14,57 +15,58 @@ services:
     depends_on:
       - frontend
       - backend
-      - database
       - grafana
       - backend-testing
       - frontend-testing
-      - database-testing    
     networks:
-      - app-network
+      - production-network
+      - testing-network
+      - monitoring-network
   
   backend:
-    image: ${DOCKER_USER}/backend:latest
+    image: ${DOCKER_USER_PROD}/backend:latest
     container_name: backend
     ports:
       - "8080:8080"
     networks: 
-      - app-network
+      - production-network
+      - testing-network
     depends_on:
       - database
     env_file:
-      - .env
-  
-   backend-testing:
-    image: ${DOCKER_USER}/backend-testing:latest
+      - .env.production
+
+  backend-testing:
+    image: ${DOCKER_USER_TEST}/backend-testing:latest
     container_name: backend-testing
     ports:
-      - "8081:8081"
+      - "8082:8080"
     networks:
-      - app-network
+      - testing-network
     depends_on:
       - frontend
       - database-testing
     env_file:
-      - .env
-   
+      - .env.testing
+
   frontend:
-    image: ${DOCKER_USER}/frontend:latest
+    image: ${DOCKER_USER_PROD}/frontend:latest
     container_name: frontend
     ports:
       - "3000:3000"
     networks: 
-      - app-network
+      - production-network
+      - testing-network
 
 
- frontend-testing:
-    image: ${DOCKER_USER}/frontend-testing:latest
+  frontend-testing:
+    image: ${DOCKER_USER_TEST}/frontend-testing:latest
     container_name: frontend-testing
     ports:
-      - "3001:3001"
-    depends-on:
-      - backend-testing    
+      - "3001:3000"
     networks:
-      - app-network
+      - testing-network
+      - production-network
 
   database:
     image: postgres:latest
@@ -76,7 +78,7 @@ services:
     ports:
       - "5432:5432"
     networks: 
-      - app-network
+      - production-network
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db:/docker-entrypoint-initdb.d
@@ -86,15 +88,15 @@ services:
     image: postgres:latest
     container_name: database-testing
     environment:
-      POSTGRES_DB: ${POSTGRES_DB_TESTING}
+      POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5433:5433"
+      - "5433:5432"
     networks:
-      - app-network
+      - testing-network
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_testing:/var/lib/postgresql/data
       - ./db:/docker-entrypoint-initdb.d
 
   # Monitoring
@@ -104,7 +106,7 @@ services:
     ports:
       - "9999:9999"
     env_file:
-      - .env
+      - .env.monitoring
     volumes:
       - ./monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini
       - grafana-storage:/var/lib/grafana
@@ -112,7 +114,7 @@ services:
       - prometheus
       - loki
     networks:
-      - app-network
+      - monitoring-network
     restart: unless-stopped 
 
   prometheus:
@@ -124,7 +126,7 @@ services:
     ports:
       - "9090:9090"
     networks:
-      - app-network
+      - monitoring-network
     restart: unless-stopped
 
   loki:
@@ -136,7 +138,7 @@ services:
     volumes:
       - ./monitoring:/mnt/config
     networks:
-      - app-network
+      - monitoring-network
     restart: unless-stopped
 
   promtail:
@@ -149,14 +151,19 @@ services:
     depends_on:
       - loki
     networks:
-      - app-network
+      - monitoring-network
     restart: unless-stopped
 
 networks:
-  app-network:
+  production-network:
+    driver: bridge
+  monitoring-network:
+    driver: bridge
+  testing-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  postgres_data_testing:
   grafana-storage:
   prometheus-data:
