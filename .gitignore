@@ -4,6 +4,8 @@
 certs
 start.sh
 db/
+ssl/
 index.html
 monitoring/grafana/
 monitoring/loki
+custom-nginx.Dockerfile
