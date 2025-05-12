@@ -1,17 +1,25 @@
 services:
-  # The app itself (prod only, soon testing)
-  # Partial support for nginx 
   nginx:
-    image: nginx:latest
+    image: nginx:stable-alpine
     container_name: nginx
+    # Option A: Keep user but add necessary capability
+    user: "101"  # nginx user
+    cap_drop:
+      - ALL
+    cap_add:
+      - CAP_DAC_OVERRIDE  # Add this to allow executing the entrypoint
     ports:
       - "80:80"
       - "443:443"
-      - "3101:3101" # for testing
+      - "3101:3101"
+        #entrypoint: /docker-entrypoint.sh
     volumes:
       - ./nginx:/etc/nginx:ro
-      - ./nginx/certs:/ssl:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
       - ${PWD_PATH}:/auth:ro
+    tmpfs:
+      - /run:uid=101,gid=101,mode=700
+      - /var/cache/nginx:uid=101,gid=101,mode=700
     depends_on:
       - frontend
       - backend
@@ -22,19 +30,30 @@ services:
       - production-network
       - testing-network
       - monitoring-network
+    read_only: true
+    restart: unless-stopped
   
   backend:
     image: ${DOCKER_USER_PROD}/backend:latest
     container_name: backend
     ports:
       - "8080:8080"
-    networks: 
+    networks:
       - production-network
       - testing-network
     depends_on:
       - database
     env_file:
       - .env.production
+    tmpfs:
+      - /tmp:rw,mode=1777
+    user: "1000:1000"
+    mem_limit: 256m
+    cpus: "0.5"
+    read_only: true
+    cap_drop:
+      - ALL
+    restart: on-failure
 
   backend-testing:
     image: ${DOCKER_USER_TEST}/backend-testing:latest
@@ -42,22 +61,37 @@ services:
     ports:
       - "8082:8080"
     networks:
+      - production-network
       - testing-network
     depends_on:
       - frontend
       - database-testing
+    tmpfs:
+      - /tmp:rw,mode=1777
     env_file:
       - .env.testing
+    user: "1000:1000"
+    mem_limit: 256m
+    cpus: "0.5"
+    read_only: true
+    cap_drop:
+      - ALL
+    restart: on-failure
 
   frontend:
     image: ${DOCKER_USER_PROD}/frontend:latest
     container_name: frontend
     ports:
       - "3000:3000"
-    networks: 
+    networks:
       - production-network
       - testing-network
-
+    user: "1000:1000"
+    mem_limit: 128m
+    cpus: "0.3"
+    cap_drop:
+      - ALL
+    restart: on-failure
 
   frontend-testing:
     image: ${DOCKER_USER_TEST}/frontend-testing:latest
@@ -67,39 +101,51 @@ services:
     networks:
       - testing-network
       - production-network
+    user: "1000:1000"
+    mem_limit: 128m
+    cpus: "0.3"
+    cap_drop:
+      - ALL
+    restart: on-failure
 
   database:
-    image: postgres:latest
+    image: postgres:15-alpine
     container_name: database-prod
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5432:5432"
-    networks: 
+    env_file:
+      - .env.production
+    networks:
       - production-network
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d
-  
+      - ./db:/docker-entrypoint-initdb.d:ro
+    mem_limit: 512m
+    cpus: "0.8"
+    user: "70:70"
+    tmpfs:
+      - /var/run/postgresql:uid=70,gid=70,mode=700
+    cap_drop:
+      - ALL
+    restart: unless-stopped
 
   database-testing:
-    image: postgres:latest
+    image: postgres:15-alpine
     container_name: database-testing
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5433:5432"
+    env_file:
+      - .env.testing
     networks:
       - testing-network
     volumes:
-      - postgres_data_testing:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d
-
-  # Monitoring
+      - postgres_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    mem_limit: 512m
+    cpus: "0.8"
+    user: "70:70"
+    tmpfs:
+      - /var/run/postgresql:uid=70,gid=70,mode=700
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+  
   grafana:
     image: grafana/grafana-oss
     container_name: grafana
@@ -108,25 +154,35 @@ services:
     env_file:
       - .env.monitoring
     volumes:
-      - ./monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - grafana-storage:/var/lib/grafana
     depends_on:
       - prometheus
       - loki
     networks:
       - monitoring-network
-    restart: unless-stopped 
+    user: "472"  # grafana user
+    mem_limit: 256m
+    cpus: "0.5"
+    cap_drop:
+      - ALL
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus
     container_name: prometheus
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
       - "9090:9090"
     networks:
       - monitoring-network
+    user: "65534"  # nobody user
+    mem_limit: 256m
+    cpus: "0.5"
+    cap_drop:
+      - ALL
     restart: unless-stopped
 
   loki:
@@ -136,22 +192,32 @@ services:
       - "3100:3100"
     command: -config.file=/mnt/config/loki-config.yaml
     volumes:
-      - ./monitoring:/mnt/config
+      - ./monitoring:/mnt/config:ro
     networks:
       - monitoring-network
+    user: "10001"  # loki default user
+    mem_limit: 256m
+    cpus: "0.5"
+    cap_drop:
+      - ALL
     restart: unless-stopped
 
   promtail:
     image: grafana/promtail:3.4.1
     container_name: promtail
     volumes:
-      - ./monitoring:/mnt/config
-      - /var/log:/var/log
+      - ./monitoring:/mnt/config:ro
+      - /var/log:/var/log:ro
     command: -config.file=/mnt/config/promtail-config.yaml
     depends_on:
       - loki
     networks:
       - monitoring-network
+    user: "10001"
+    mem_limit: 128m
+    cpus: "0.3"
+    cap_drop:
+      - ALL
     restart: unless-stopped
 
 networks:
@@ -167,3 +233,4 @@ volumes:
   postgres_data_testing:
   grafana-storage:
   prometheus-data:
+
