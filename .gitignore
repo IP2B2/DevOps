@@ -1,10 +1,11 @@
 .env
 .env.*
 .htpasswd
-certs
+nginx/certs
 start.sh
 db/
 ssl/
+nginx/www/
 index.html
 monitoring/grafana/
 monitoring/loki
