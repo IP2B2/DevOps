@@ -10,3 +10,4 @@ index.html
 monitoring/grafana/
 monitoring/loki
 custom-nginx.Dockerfile
+uploads

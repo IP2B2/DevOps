@@ -3,10 +3,6 @@ services:
     image: nginx:stable-alpine
     container_name: nginx
     user: "101"  # nginx user
-    cap_drop:
-      - ALL
-    cap_add:
-      - CAP_DAC_OVERRIDE  # allow executing the entrypoint
     ports:
       - "80:80"
       - "443:443"
@@ -14,6 +10,7 @@ services:
       - "9998:9998"
     volumes:
       - ./nginx:/etc/nginx:ro
+      - ./nginx/www/uploads:/uploads
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./nginx/www:/var/www/certbot:ro
       - ${PWD_PATH}:/auth:ro
@@ -31,6 +28,10 @@ services:
       - testing-network
       - monitoring-network
     read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CAP_DAC_OVERRIDE  # allow executing the entrypoint
     restart: unless-stopped
   
   backend:
@@ -38,19 +39,20 @@ services:
     container_name: backend
     ports:
       - "8080:8080"
+    volumes:
+      - ./nginx/www/uploads:/uploads
     networks:
       - production-network
       - testing-network
     depends_on:
       - database
-    env_file:
-      - .env.production
     tmpfs:
       - /tmp:rw,mode=1777
-    user: "1000:1000"
+    env_file:
+      - .env.production
     mem_limit: 256m
+    user: "100:100" # appuser
     cpus: "0.5"
-    read_only: true
     cap_drop:
       - ALL
     restart: on-failure
@@ -62,19 +64,20 @@ services:
       - "8082:8080"
     networks:
       - testing-network
+    volumes:
+      - ./nginx/www/uploads:/uploads
+    tmpfs:
+      - /tmp:rw,mode=1777
     depends_on:
       - frontend
       - database-testing
-    tmpfs:
-      - /tmp:rw,mode=1777
     env_file:
       - .env.testing
-    user: "1000:1000"
-    mem_limit: 256m
-    cpus: "0.5"
-    read_only: true
+    user: "100:100"
     cap_drop:
       - ALL
+    mem_limit: 256m
+    cpus: "0.5"
     restart: on-failure
 
   frontend:
