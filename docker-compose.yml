@@ -27,7 +27,6 @@ services:
       - production-network
       - testing-network
       - monitoring-network
-    read_only: true
     cap_drop:
       - ALL
     cap_add:
@@ -88,11 +87,11 @@ services:
     networks:
       - production-network
       - testing-network
-    user: "1000:1000"
+    user: "1200:1200"
+      #volumes:
+      #- ./frontend-next-cache:/app/.next/cache/images
     mem_limit: 128m
     cpus: "0.3"
-    cap_drop:
-      - ALL
     restart: on-failure
 
   frontend-testing:
@@ -103,11 +102,11 @@ services:
     networks:
       - testing-network
       - production-network
-    user: "1000:1000"
+    user: "1200:1200"
+      #volumes:
+      #- ./frontend-testing-next-cache:/app/.next/cache/images
     mem_limit: 128m
     cpus: "0.3"
-    cap_drop:
-      - ALL
     restart: on-failure
 
   database:
