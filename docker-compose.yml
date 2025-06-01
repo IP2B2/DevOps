@@ -84,6 +84,8 @@ services:
     container_name: frontend
     ports:
       - "3000:3000"
+    env_file:
+      - .env.production
     networks:
       - production-network
       - testing-network
@@ -99,6 +101,8 @@ services:
     container_name: frontend-testing
     ports:
       - "3001:3000"
+    env_file:
+      - .env.testing
     networks:
       - testing-network
       - production-network
